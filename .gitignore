@@ -1,0 +1,7 @@
+*~
+*.beam
+/.*/
+/doc/
+/ebin/
+priv/
+.dialyzer.plt
