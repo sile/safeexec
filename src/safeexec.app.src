@@ -1,7 +1,7 @@
 {application, safeexec,
  [
   {description, "A tiny C command and Erlang API which provide safer exit handling for external program ports"},
-  {vsn, "0.0.1"},
+  {vsn, "0.1.0"},
   {registered, []},
   {applications, [
                   kernel,
