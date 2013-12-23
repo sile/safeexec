@@ -118,7 +118,7 @@ enum HANDLE_RESULT handle_read(int fd, uint32_t events, struct PARENT_STATE * st
   if (events & (EPOLLERR | EPOLLHUP)) {
     if(state->buf_end == 0) {
       if (close(STDOUT_FILENO) == -1) { ERRMSG("close() failed"); return KILL_CHILD; }
-      if (kill_and_wait_sigchild(state->child_pid, SIGPIPE, 1) == -1) {
+      if (kill_and_wait_sigchild(state->child_pid, SIGTERM, 1) == -1) {
         return KILL_CHILD;
       }
       return WAIT_CHILD_EXIT;
@@ -148,6 +148,7 @@ int parent_main(pid_t child_pid) {
   int status;
   sigset_t sigs;
 
+  state.child_pid = child_pid;
   if (sigfillset(&sigs)                     == -1) { ERRMSG("sigfillset() failed");  goto kill_child; }
   if (sigprocmask(SIG_SETMASK, &sigs, NULL) == -1) { ERRMSG("sigprocmask() failed"); goto kill_child; }
   if ((sigfd = signalfd(-1, &sigs, 0))      == -1) { ERRMSG("signalfd() failed");    goto kill_child; }
