@@ -184,6 +184,6 @@ int parent_main(pid_t child_pid) {
  wait_child_exit:
   if (waitpid(state.child_pid, &status, 0) == -1) { ERR_EXIT("waitpid() failed"); }
   if (WIFEXITED(status))   { return WEXITSTATUS(status); }
-  if (WIFSIGNALED(status)) { return -WTERMSIG(status); }
+  if (WIFSIGNALED(status)) { return WTERMSIG(status) + 128; }
   return 1;
 }

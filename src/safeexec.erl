@@ -7,7 +7,8 @@
 %% Exported API
 %%--------------------------------------------------------------------------------
 -export([
-         open_port/2
+         open_port/2,
+         get_safeexec_path/0
         ]).
 
 %%--------------------------------------------------------------------------------
@@ -41,9 +42,6 @@ open_port({spawn_executable, FileName}, PortSettings0) ->
     PortSettings2 = update_setting(args, fun (Args) -> [FileName | Args] end, [FileName], PortSettings1),
     erlang:open_port({spawn_executable, get_safeexec_path()}, PortSettings2).
 
-%%--------------------------------------------------------------------------------
-%% Internal Functions
-%%--------------------------------------------------------------------------------
 -spec get_safeexec_path() -> string().
 get_safeexec_path() ->
     case code:priv_dir(?MODULE) of
@@ -55,6 +53,9 @@ get_safeexec_path() ->
             end
     end.
 
+%%--------------------------------------------------------------------------------
+%% Internal Functions
+%%--------------------------------------------------------------------------------
 -spec quote(string()) -> string().
 quote([])        -> [];
 quote([$\' | S]) -> "'\\''" ++ quote(S);
