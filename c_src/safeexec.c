@@ -58,13 +58,6 @@ int epoll_add(int epfd, int fd, uint32_t events) {
   return epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev);
 }
 
-int epoll_mod(int epfd, int fd, uint32_t events) {
-  struct epoll_event ev;
-  ev.events  = events;
-  ev.data.fd = fd;
-  return epoll_ctl(epfd, EPOLL_CTL_MOD, fd, &ev);
-}
-
 int kill_and_wait_sigchild(pid_t child_pid, int signal, uint32_t timeout_seconds) {
   sigset_t sigs;
   struct timespec wait_timeout = {timeout_seconds, 0};
