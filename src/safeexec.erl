@@ -29,7 +29,7 @@
                     | use_stdio
                     | nouse_stdio
                     | stderr_to_stdout
-                    | in
+% unsupported:      | in
                     | out
                     | binary
                     | eof
@@ -40,6 +40,10 @@ open_port({spawn, Command}, PortSettings) ->
 open_port({spawn_executable, FileName}, PortSettings0) ->
     PortSettings1 = update_setting(arg0, fun (Arg0) -> Arg0 end, get_safeexec_path(), PortSettings0),
     PortSettings2 = update_setting(args, fun (Args) -> [FileName | Args] end, [FileName], PortSettings1),
+    _ = case lists:member(in, PortSettings2) of
+            true  -> error({unsupported_option, in});  % inオプションがついているとポートが閉じたこと(= コマンド側の標準入力が閉じたこと)が検出できないので非サポート
+            false -> ok
+        end,
     erlang:open_port({spawn_executable, get_safeexec_path()}, PortSettings2).
 
 -spec get_safeexec_path() -> string().
