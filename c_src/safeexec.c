@@ -107,8 +107,14 @@ int parent_main(pid_t child_pid) {
     int i;
     enum HANDLE_RESULT handle_ret;
     struct epoll_event e[3];
-    int nfd = epoll_wait(epfd, e, sizeof(e) / sizeof(struct epoll_event), -1);
+    int nfd = epoll_wait(epfd, e, sizeof(e) / sizeof(struct epoll_event), 100);
     if (nfd == -1) { ERRMSG("epoll_wait() failed"); goto kill_child; }
+    if (nfd == 0) {
+      int ret = waitpid(child_pid, &status, WNOHANG);
+      if (ret == -1) { ERRMSG("waitpid() failed");  goto kill_child; }
+      if (ret != 0)  { goto child_exited; }
+      continue;
+    }
 
     for (i = 0; i < nfd; i++) {
       int fd = e[i].data.fd;
@@ -128,6 +134,8 @@ int parent_main(pid_t child_pid) {
   
  wait_child_exit:
   if (waitpid(child_pid, &status, 0) == -1) { ERR_EXIT("waitpid() failed"); }
+
+ child_exited:
   if (WIFEXITED(status))   { return WEXITSTATUS(status); }
   if (WIFSIGNALED(status)) { return WTERMSIG(status) + 128; }
   return 1;
