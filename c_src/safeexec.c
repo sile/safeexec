@@ -18,8 +18,7 @@
 
 enum HANDLE_RESULT {
   KILL_CHILD,
-  WAIT_CHILD_EXIT,
-  CONTINUE
+  WAIT_CHILD_EXIT
 };
 
 int parent_main(pid_t child_pid);
@@ -86,7 +85,7 @@ enum HANDLE_RESULT handle_in_eof(int fd, pid_t child_pid) {
   if (kill_and_wait_sigchild(child_pid, SIGTERM, 1) == -1) {
     return KILL_CHILD;
   }
-  return CONTINUE;
+  return WAIT_CHILD_EXIT;
 }
 
 int parent_main(pid_t child_pid) {
@@ -95,9 +94,9 @@ int parent_main(pid_t child_pid) {
   int status;
   sigset_t sigs;
 
-  if (sigfillset(&sigs)                     == -1) { ERRMSG("sigfillset() failed");  goto kill_child; }
-  if (sigprocmask(SIG_SETMASK, &sigs, NULL) == -1) { ERRMSG("sigprocmask() failed"); goto kill_child; }
-  if ((sigfd = signalfd(-1, &sigs, 0))      == -1) { ERRMSG("signalfd() failed");    goto kill_child; }
+  if (sigfillset(&sigs)                           == -1) { ERRMSG("sigfillset() failed");  goto kill_child; }
+  if (sigprocmask(SIG_SETMASK, &sigs, NULL)       == -1) { ERRMSG("sigprocmask() failed"); goto kill_child; }
+  if ((sigfd = signalfd(-1, &sigs, SFD_NONBLOCK)) == -1) { ERRMSG("signalfd() failed");    goto kill_child; }
 
   if ((epfd = epoll_create(1))         == -1) { ERRMSG("epoll_create() failed"); goto kill_child; }
   if (epoll_add(epfd, sigfd, EPOLLIN)  == -1) { ERRMSG("epoll_add() failed"); goto kill_child; }
@@ -124,7 +123,6 @@ int parent_main(pid_t child_pid) {
       switch(handle_ret) {
       case KILL_CHILD:      goto kill_child;
       case WAIT_CHILD_EXIT: goto wait_child_exit;
-      case CONTINUE:        break;
       }
     }
   }
