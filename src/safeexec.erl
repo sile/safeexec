@@ -48,13 +48,14 @@ open_port({spawn_executable, FileName}, PortSettings0) ->
 
 -spec get_safeexec_path() -> string().
 get_safeexec_path() ->
-    case code:priv_dir(?MODULE) of
-        {error, bad_name} -> error({priv_dir_is_not_found, ?MODULE});
-        PrivDir           ->
-            case os:find_executable("safeexec", PrivDir) of
-                false -> error({safexec_command_is_not_found, PrivDir});
-                Path  -> filename:absname(Path)
-            end
+    PrivDir =
+        case code:priv_dir(?MODULE) of
+            {error, bad_name} -> filename:join(filname:dirname(filename:dirname(code:which(?MODULE))), "priv");
+            Dir               -> Dir
+        end,
+    case os:find_executable("safeexec", PrivDir) of
+        false -> error({safexec_command_is_not_found, PrivDir});
+        Path  -> filename:absname(Path)
     end.
 
 %%--------------------------------------------------------------------------------
