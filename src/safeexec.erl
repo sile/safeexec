@@ -15,7 +15,7 @@
 %% Exported Functions
 %%--------------------------------------------------------------------------------
 -spec open_port(PortName, PortSettings) -> port() when
-      PortName     :: {spawn, Command :: string()}
+      PortName     :: {spawn, Command :: string() | binary()}
                     | {spawn_executable, FileName :: file:name()},
       PortSettings :: [Opt],
       Opt          :: {packet, N :: 1 | 2 | 4}
@@ -35,6 +35,8 @@
                     | eof
                     | {parallelism, Boolean :: boolean()}
                     | hide.
+open_port({spawn, Command}, PortSettings) when is_binary(Command) ->
+    safeexec:open_port({spawn, binary_to_list(Command)}, PortSettings);
 open_port({spawn, Command}, PortSettings) ->
     erlang:open_port({spawn, quote(get_safeexec_path()) ++ " " ++ Command}, PortSettings);
 open_port({spawn_executable, FileName}, PortSettings0) ->
