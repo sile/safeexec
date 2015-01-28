@@ -4,6 +4,12 @@ safeexec
 `erlang:open_port/2`により起動した外部コマンドの終了処理を安全・確実に行えるようにするためのライブラリ。  
 このライブラリは、C言語で記述されたsafeexec コマンドとそれを利用するErlangインタフェースを提供する。
 
+対応OS
+------
+- Linux
+- Mac
+  - experimental
+  - safeexecコマンドがSIGKILLで落とされた場合に、子プロセスが残ってしまうことがある
 
 safeexecコマンド
 ---------------
