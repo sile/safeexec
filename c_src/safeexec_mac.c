@@ -1,5 +1,5 @@
 /**
- * Copyright 2013 Takeru Ohta <phjgt308@gmail.com>
+ * Copyright 2015 Takeru Ohta <phjgt308@gmail.com>
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,9 +9,7 @@
 #include <signal.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-#include <sys/prctl.h>
-#include <sys/epoll.h>
-#include <sys/signalfd.h>
+#include <sys/event.h>
 
 #define ERRMSG(Message) fprintf(stderr, "[error:%d] " Message ": pid=%d, ppid=%d, error=%s(%d)\n", __LINE__, getpid(), getppid(), strerror(errno), errno)
 #define ERR_EXIT(Message) {ERRMSG(Message); exit(1);}
@@ -39,35 +37,35 @@ int main(int argc, char ** argv)
 
     if(ret > 0) {
       // parent
-      if (prctl(PR_SET_PDEATHSIG, SIGTERM) == -1) { ERR_EXIT("parent prctl() failed"); }
+      // TODO: if (prctl(PR_SET_PDEATHSIG, SIGTERM) == -1) { ERR_EXIT("parent prctl() failed"); }
       return parent_main(ret);
     } else {
       // child
-      if (prctl(PR_SET_PDEATHSIG, SIGKILL)   == -1) { ERR_EXIT("child prctl() failed"); }
+      // TODO: if (prctl(PR_SET_PDEATHSIG, SIGKILL)   == -1) { ERR_EXIT("child prctl() failed"); }
       if (execvp(command_path, command_args) == -1) { ERR_EXIT("execvp() faied"); }
     }
   }
   return 0;
 }
 
-int epoll_add(int epfd, int fd, uint32_t events) {
-  struct epoll_event ev;
-  ev.events  = events;
-  ev.data.fd = fd;
-  return epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev);
+int poll_add(int kq, int fd, int filter) {
+  struct kevent kev;
+  EV_SET(&kev, fd, filter, EV_ADD, 0, 0, NULL);
+  return kevent(kq, &kev, 1, NULL, 0, NULL);
 }
 
 int kill_and_wait_sigchild(pid_t child_pid, int signal, uint32_t timeout_seconds) {
   sigset_t sigs;
-  struct timespec wait_timeout = {timeout_seconds, 0};
+  //struct timespec wait_timeout = {timeout_seconds, 0};
   if (kill(child_pid, signal) == -1)   { ERRMSG("kill() failed");        return -1; }
   if (sigemptyset(&sigs) == -1)        { ERRMSG("sigemptyset() failed"); return -1; }
   if (sigaddset(&sigs, SIGCHLD) == -1) { ERRMSG("sigaddset() failed");   return -1; }
-  if (sigtimedwait(&sigs, NULL, &wait_timeout) == -1) {
-    if(errno != EAGAIN) { ERRMSG("sigtimedwait() failed"); }
-    return -1;
-  }
-  return 0;
+  // TODO
+  //if (sigtimedwait(&sigs, NULL, &wait_timeout) == -1) {
+  //  if(errno != EAGAIN) { ERRMSG("sigtimedwait() failed"); }
+  //  return -1;
+  //}
+  return 0; 
 }
 
 enum HANDLE_RESULT handle_signal(int fd, pid_t child_pid) {
@@ -89,24 +87,24 @@ enum HANDLE_RESULT handle_in_eof(int fd, pid_t child_pid) {
 }
 
 int parent_main(pid_t child_pid) {
-  int epfd;
-  int sigfd;
+  int kq;
+  int sigfd = 0; // XXX: invalid intialization
   int status;
   sigset_t sigs;
 
   if (sigfillset(&sigs)                           == -1) { ERRMSG("sigfillset() failed");  goto kill_child; }
   if (sigprocmask(SIG_SETMASK, &sigs, NULL)       == -1) { ERRMSG("sigprocmask() failed"); goto kill_child; }
-  if ((sigfd = signalfd(-1, &sigs, SFD_NONBLOCK)) == -1) { ERRMSG("signalfd() failed");    goto kill_child; }
+  //TODO:if ((sigfd = signalfd(-1, &sigs, SFD_NONBLOCK)) == -1) { ERRMSG("signalfd() failed");    goto kill_child; }
 
-  if ((epfd = epoll_create(1))         == -1) { ERRMSG("epoll_create() failed"); goto kill_child; }
-  if (epoll_add(epfd, sigfd, EPOLLIN)  == -1) { ERRMSG("epoll_add() failed"); goto kill_child; }
-  if (epoll_add(epfd, STDIN_FILENO, 0) == -1) { ERRMSG("epoll_add() failed"); goto kill_child; }
+  if ((kq = kqueue())                  == -1) { ERRMSG("kqueue() failed"); goto kill_child; }
+  if (poll_add(kq, sigfd, EVFILT_READ) == -1) { ERRMSG("poll_add() failed"); goto kill_child; }
+  if (poll_add(kq, STDIN_FILENO, 0)    == -1) { ERRMSG("poll_add() failed"); goto kill_child; }
 
   for (;;) {
     int i;
     enum HANDLE_RESULT handle_ret;
-    struct epoll_event e[3];
-    int nfd = epoll_wait(epfd, e, sizeof(e) / sizeof(struct epoll_event), 100);
+    struct kevent e[3];
+    int nfd = kevent(kq, NULL, 0, e, sizeof(e) / sizeof(struct kevent), NULL); // TODO: set timeout
     if (nfd == -1) { ERRMSG("epoll_wait() failed"); goto kill_child; }
     if (nfd == 0) {
       int ret = waitpid(child_pid, &status, WNOHANG);
@@ -116,7 +114,7 @@ int parent_main(pid_t child_pid) {
     }
 
     for (i = 0; i < nfd; i++) {
-      int fd = e[i].data.fd;
+      int fd = e[i].ident;
       if (fd == sigfd) { handle_ret = handle_signal(fd, child_pid); }
       else             { handle_ret = handle_in_eof(fd, child_pid); }
       
