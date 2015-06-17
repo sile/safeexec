@@ -11,8 +11,9 @@
 #include <sys/wait.h>
 #include <sys/event.h>
 
-#define ERRMSG(Message) fprintf(stderr, "[error:%d] " Message ": pid=%d, ppid=%d, error=%s(%d)\n", __LINE__, getpid(), getppid(), strerror(errno), errno)
+#define ERRMSG(Message) fprintf(stderr, "%s:[error:%d] " Message ": pid=%d, ppid=%d, error=%s(%d)\n", __FILE__, __LINE__, getpid(), getppid(), strerror(errno), errno)
 #define ERR_EXIT(Message) {ERRMSG(Message); exit(1);}
+#define EXECVP_ERR(Command) {ERRMSG("execvp() failed"); fprintf(stderr, "failed command: %s\n", command_path); exit(1);}
 
 int sigisemptyset(const sigset_t * sigs) {
   // inefficient and incorrect
@@ -54,7 +55,7 @@ int main(int argc, char ** argv)
     } else {
       // child
       // XXX: When the parent process is killed by SIGKILL signal, the child process will be still alive
-      if (execvp(command_path, command_args) == -1) { ERR_EXIT("execvp() faied"); }
+      if (execvp(command_path, command_args) == -1) { EXECVP_ERR(command_path); };
     }
   }
   return 0;

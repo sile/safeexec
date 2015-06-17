@@ -13,8 +13,9 @@
 #include <sys/epoll.h>
 #include <sys/signalfd.h>
 
-#define ERRMSG(Message) fprintf(stderr, "[error:%d] " Message ": pid=%d, ppid=%d, error=%s(%d)\n", __LINE__, getpid(), getppid(), strerror(errno), errno)
+#define ERRMSG(Message) fprintf(stderr, "%s:[error:%d] " Message ": pid=%d, ppid=%d, error=%s(%d)\n", __FILE__, __LINE__, getpid(), getppid(), strerror(errno), errno)
 #define ERR_EXIT(Message) {ERRMSG(Message); exit(1);}
+#define EXECVP_ERR(Command) {ERRMSG("execvp() failed"); fprintf(stderr, "failed command: %s\n", command_path); exit(1);}
 
 enum HANDLE_RESULT {
   KILL_CHILD,
@@ -44,7 +45,7 @@ int main(int argc, char ** argv)
     } else {
       // child
       if (prctl(PR_SET_PDEATHSIG, SIGKILL)   == -1) { ERR_EXIT("child prctl() failed"); }
-      if (execvp(command_path, command_args) == -1) { ERR_EXIT("execvp() faied"); }
+      if (execvp(command_path, command_args) == -1) { EXECVP_ERR(command_path); };
     }
   }
   return 0;
