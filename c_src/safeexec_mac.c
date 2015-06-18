@@ -17,7 +17,7 @@ static void errmsgf(char *str, ...)
 {
   va_list ap;
   va_start(ap, str);
-  fprintf(stderr, "error[%s:%d] ", __FILE__, __LINE__);
+  fprintf(stderr, "%s:%d [error] ", __FILE__, __LINE__);
   vfprintf(stderr, str, ap);
   fprintf(stderr, ": pid=%d, ppid=%d, error=%s(%d)\n", getpid(), getppid(), strerror(errno), errno);
   va_end(ap);
@@ -66,7 +66,7 @@ int main(int argc, char ** argv)
     } else {
       // child
       // XXX: When the parent process is killed by SIGKILL signal, the child process will be still alive
-      if (execvp(command_path, command_args) == -1) { ERRF_EXIT(("execvp() failed(command=%s)", command_path)); };
+      if (execvp(command_path, command_args) == -1) { ERRF_EXIT(("execvp() failed [command=%s]", command_path)); };
     }
   }
   return 0;
