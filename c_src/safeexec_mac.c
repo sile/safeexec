@@ -10,9 +10,21 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/event.h>
+#include <stdarg.h>
 
-#define ERRMSG(Message) fprintf(stderr, "[error:%d] " Message ": pid=%d, ppid=%d, error=%s(%d)\n", __LINE__, getpid(), getppid(), strerror(errno), errno)
-#define ERR_EXIT(Message) {ERRMSG(Message); exit(1);}
+#define ERRMSGF(P) errmsgf P
+static void errmsgf(char *str, ...)
+{
+  va_list ap;
+  va_start(ap, str);
+  fprintf(stderr, "%s:%d [error] ", __FILE__, __LINE__);
+  vfprintf(stderr, str, ap);
+  fprintf(stderr, ": pid=%d, ppid=%d, error=%s(%d)\n", getpid(), getppid(), strerror(errno), errno);
+  va_end(ap);
+}
+#define ERRMSG(Message) ERRMSGF((Message))
+#define ERRF_EXIT(Param) {ERRMSGF(Param); exit(1);}
+#define ERR_EXIT(Message) ERRF_EXIT((Message))
 
 int sigisemptyset(const sigset_t * sigs) {
   // inefficient and incorrect
@@ -54,7 +66,7 @@ int main(int argc, char ** argv)
     } else {
       // child
       // XXX: When the parent process is killed by SIGKILL signal, the child process will be still alive
-      if (execvp(command_path, command_args) == -1) { ERR_EXIT("execvp() faied"); }
+      if (execvp(command_path, command_args) == -1) { ERRF_EXIT(("execvp() failed [command=%s]", command_path)); };
     }
   }
   return 0;

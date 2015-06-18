@@ -12,9 +12,21 @@
 #include <sys/prctl.h>
 #include <sys/epoll.h>
 #include <sys/signalfd.h>
+#include <stdarg.h>
 
-#define ERRMSG(Message) fprintf(stderr, "[error:%d] " Message ": pid=%d, ppid=%d, error=%s(%d)\n", __LINE__, getpid(), getppid(), strerror(errno), errno)
-#define ERR_EXIT(Message) {ERRMSG(Message); exit(1);}
+#define ERRMSGF(P) errmsgf P
+static void errmsgf(char *str, ...)
+{
+  va_list ap;
+  va_start(ap, str);
+  fprintf(stderr, "%s:%d [error] ", __FILE__, __LINE__);
+  vfprintf(stderr, str, ap);
+  fprintf(stderr, ": pid=%d, ppid=%d, error=%s(%d)\n", getpid(), getppid(), strerror(errno), errno);
+  va_end(ap);
+}
+#define ERRMSG(Message) ERRMSGF((Message))
+#define ERRF_EXIT(Arg) {ERRMSGF(Arg); exit(1);}
+#define ERR_EXIT(Message) ERRF_EXIT((Message))
 
 enum HANDLE_RESULT {
   KILL_CHILD,
@@ -44,7 +56,7 @@ int main(int argc, char ** argv)
     } else {
       // child
       if (prctl(PR_SET_PDEATHSIG, SIGKILL)   == -1) { ERR_EXIT("child prctl() failed"); }
-      if (execvp(command_path, command_args) == -1) { ERR_EXIT("execvp() faied"); }
+      if (execvp(command_path, command_args) == -1) { ERRF_EXIT(("execvp() failed [command = %s]", command_path)); };
     }
   }
   return 0;
