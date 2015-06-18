@@ -10,10 +10,10 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/event.h>
-
-#define ERRMSG(P) errmsg P
 #include <stdarg.h>
-static void errmsg(char *str, ...)
+
+#define ERRMSGF(P) errmsgf P
+static void errmsgf(char *str, ...)
 {
   va_list ap;
   va_start(ap, str);
@@ -22,7 +22,9 @@ static void errmsg(char *str, ...)
   fprintf(stderr, ": pid=%d, ppid=%d, error=%s(%d)\n", getpid(), getppid(), strerror(errno), errno);
   va_end(ap);
 }
-#define ERR_EXIT(Param) {ERRMSG(Param); exit(1);}
+#define ERRMSG(Message) ERRMSGF((Message))
+#define ERRF_EXIT(Param) {ERRMSGF(Param); exit(1);}
+#define ERR_EXIT(Message) ERRF_EXIT((Message))
 
 int sigisemptyset(const sigset_t * sigs) {
   // inefficient and incorrect
@@ -56,7 +58,7 @@ int main(int argc, char ** argv)
     int ret;
     
     ret = fork();
-    if (ret == -1) { ERR_EXIT(("fork() failed")); }
+    if (ret == -1) { ERR_EXIT("fork() failed"); }
 
     if(ret > 0) {
       // parent
@@ -64,7 +66,7 @@ int main(int argc, char ** argv)
     } else {
       // child
       // XXX: When the parent process is killed by SIGKILL signal, the child process will be still alive
-      if (execvp(command_path, command_args) == -1) { ERR_EXIT(("execvp() failed(command=%s)", command_path)); };
+      if (execvp(command_path, command_args) == -1) { ERRF_EXIT(("execvp() failed(command=%s)", command_path)); };
     }
   }
   return 0;
@@ -77,16 +79,16 @@ int poll_add(int kq, int fd, int filter) {
 }
 
 int kill_and_wait_sigchild(pid_t child_pid, int signal, uint32_t timeout_seconds) {
-  if (kill(child_pid, signal) == -1)   { ERRMSG(("kill() failed")); return -1; }
+  if (kill(child_pid, signal) == -1)   { ERRMSG("kill() failed"); return -1; }
 
   int kq;
-  if ((kq  = kqueue()) == -1) { ERRMSG(("kqueue() failed")); return -1; }
-  if (poll_add(kq, SIGCHLD, EVFILT_SIGNAL) == -1) { ERRMSG(("poll_add() failed")); close(kq); return -1; }
+  if ((kq  = kqueue()) == -1) { ERRMSG("kqueue() failed"); return -1; }
+  if (poll_add(kq, SIGCHLD, EVFILT_SIGNAL) == -1) { ERRMSG("poll_add() failed"); close(kq); return -1; }
 
   struct timespec timeout;
   timeout.tv_sec = timeout_seconds;
   timeout.tv_nsec = 0;
-  if (kevent(kq, NULL, 0, NULL, 0, &timeout) == -1) { ERRMSG(("kevent() failed")); close(kq); return -1; }
+  if (kevent(kq, NULL, 0, NULL, 0, &timeout) == -1) { ERRMSG("kevent() failed"); close(kq); return -1; }
   close(kq);
   return 0;
 }
@@ -115,10 +117,10 @@ int parent_main(pid_t child_pid) {
   int status;
   sigset_t sigs;
 
-  if (sigfillset(&sigs)                        == -1) { ERRMSG(("sigfillset() failed"));  goto kill_child; }
-  if (sigprocmask(SIG_SETMASK, &sigs, NULL)    == -1) { ERRMSG(("sigprocmask() failed")); goto kill_child; }
-  if ((kq = kqueue())                          == -1) { ERRMSG(("kqueue() failed")); goto kill_child; }
-  if (poll_add(kq, STDIN_FILENO, EVFILT_READ)  == -1) { ERRMSG(("poll_add() failed")); goto kill_child; }
+  if (sigfillset(&sigs)                        == -1) { ERRMSG("sigfillset() failed");  goto kill_child; }
+  if (sigprocmask(SIG_SETMASK, &sigs, NULL)    == -1) { ERRMSG("sigprocmask() failed"); goto kill_child; }
+  if ((kq = kqueue())                          == -1) { ERRMSG("kqueue() failed"); goto kill_child; }
+  if (poll_add(kq, STDIN_FILENO, EVFILT_READ)  == -1) { ERRMSG("poll_add() failed"); goto kill_child; }
 
   for (;;) {
     int i;
@@ -129,13 +131,13 @@ int parent_main(pid_t child_pid) {
     timeout.tv_nsec = 100 * 1000 * 1000; // 100ms
 
     int nfd = kevent(kq, NULL, 0, e, sizeof(e) / sizeof(struct kevent), &timeout);
-    if (nfd == -1) { ERRMSG(("kevent() failed")); goto kill_child; }
+    if (nfd == -1) { ERRMSG("kevent() failed"); goto kill_child; }
     if (nfd == 0) {
       int ret = waitpid(child_pid, &status, WNOHANG);
-      if (ret == -1) { ERRMSG(("waitpid() failed"));  goto kill_child; }
+      if (ret == -1) { ERRMSG("waitpid() failed");  goto kill_child; }
       if (ret != 0)  { goto child_exited; }
 
-      if (sigpending(&sigs) == -1) { ERRMSG(("sigpending() failed")); goto kill_child; }
+      if (sigpending(&sigs) == -1) { ERRMSG("sigpending() failed"); goto kill_child; }
       handle_ret = handle_signal(&sigs, child_pid);
     }
 
@@ -156,10 +158,10 @@ int parent_main(pid_t child_pid) {
   }
   
  kill_child:
-  if (kill(child_pid, SIGKILL) == -1) { ERR_EXIT(("kill() failed")); }
+  if (kill(child_pid, SIGKILL) == -1) { ERR_EXIT("kill() failed"); }
   
  wait_child_exit:
-  if (waitpid(child_pid, &status, 0) == -1) { ERR_EXIT(("waitpid() failed")); }
+  if (waitpid(child_pid, &status, 0) == -1) { ERR_EXIT("waitpid() failed"); }
 
  child_exited:
   if (WIFEXITED(status))   { return WEXITSTATUS(status); }
