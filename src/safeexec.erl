@@ -1,4 +1,4 @@
-%% @copyright 2013 Takeru Ohta <phjgt308@gmail.com>
+%% @copyright 2013-2015 Takeru Ohta <phjgt308@gmail.com>
 %%
 %% @doc Interface Module for safeexec command
 -module(safeexec).
@@ -52,7 +52,7 @@ open_port({spawn_executable, FileName}, PortSettings0) ->
 get_safeexec_path() ->
     PrivDir =
         case code:priv_dir(?MODULE) of
-            {error, bad_name} -> filename:join(filname:dirname(filename:dirname(code:which(?MODULE))), "priv");
+            {error, bad_name} -> filename:join(filename:dirname(filename:dirname(code:which(?MODULE))), "priv");
             Dir               -> Dir
         end,
     case os:find_executable("safeexec", PrivDir) of
