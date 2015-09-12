@@ -45,6 +45,7 @@ int main(int argc, char ** argv)
     const char * command_path = argv[1];
     char ** command_args = &argv[1];
     int ret;
+    int ppid = getpid();
 
     ret = fork();
     if (ret == -1) { ERR_EXIT("fork() failed"); }
@@ -56,6 +57,7 @@ int main(int argc, char ** argv)
     } else {
       // child
       if (prctl(PR_SET_PDEATHSIG, SIGKILL)   == -1) { ERR_EXIT("child prctl() failed"); }
+      if (ppid != getppid()) { ERRF_EXIT(("parent process(%d) has been dead", ppid)); }
       if (execvp(command_path, command_args) == -1) { ERRF_EXIT(("execvp() failed [command = %s]", command_path)); };
     }
   }
@@ -131,17 +133,17 @@ int parent_main(pid_t child_pid) {
       int fd = e[i].data.fd;
       if (fd == sigfd) { handle_ret = handle_signal(fd, child_pid); }
       else             { handle_ret = handle_in_eof(fd, child_pid); }
-      
+
       switch(handle_ret) {
       case KILL_CHILD:      goto kill_child;
       case WAIT_CHILD_EXIT: goto wait_child_exit;
       }
     }
   }
-  
+
  kill_child:
   if (kill(child_pid, SIGKILL) == -1) { ERR_EXIT("kill() failed"); }
-  
+
  wait_child_exit:
   if (waitpid(child_pid, &status, 0) == -1) { ERR_EXIT("waitpid() failed"); }
 
