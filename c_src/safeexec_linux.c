@@ -13,6 +13,9 @@
 #include <sys/epoll.h>
 #include <sys/signalfd.h>
 #include <stdarg.h>
+#define __USE_GNU
+#define _GNU_SOURCE
+#include <sched.h>
 
 #define ERRMSGF(P) errmsgf P
 static void errmsgf(char *str, ...)
@@ -34,16 +37,50 @@ enum HANDLE_RESULT {
 };
 
 int parent_main(pid_t child_pid);
+int set_affinities(pid_t pid, long cpuids);
 
 int main(int argc, char ** argv)
 {
   if (argc < 2) {
-    fprintf(stderr, "Usage: safeexec COMMAND [COMMAND_ARG...]\n");
+    fprintf(stderr, "Usage: safeexec [OPTIONS] COMMAND [COMMAND_ARG...]\n");
+    fprintf(stderr, "Options\n");
+    fprintf(stderr, "  --cpu CPU_MASK : Run process on the set of CPUs be eligible to run.\n");
+    fprintf(stderr, "                   CPU_MASK determines the set of CPUs be eligible to run and is specified by hex(e.g. 0x01).\n");
     return 1;
   }
   {
-    const char * command_path = argv[1];
-    char ** command_args = &argv[1];
+    long cpuids = -1;
+    
+    argc--;
+    argv++;
+    
+    // process option
+    while(argc > 1){
+        // cpuオプション
+        if(strcmp(argv[0], "--cpu") == 0){
+            if(argc < 2){
+                ERR_EXIT("--cpu option needs CPU_MASK");
+            }
+            char *endptr = NULL;
+            cpuids = strtol(argv[1], &endptr, 16);
+            if(*endptr != '\0'){
+                fprintf(stderr, "CPU_MASK must be specified by hex(e.g. 0x01)\n");
+                return 1;
+            }
+            argc -= 2;
+            argv += 2;
+        }
+        else{
+            break;
+        }
+    }
+
+    if(argc < 1){
+        ERR_EXIT("COMMAND path is not found");
+    }
+      
+    const char * command_path = argv[0];
+    char ** command_args = &argv[0];
     int ret;
     int ppid = getpid();
 
@@ -58,10 +95,28 @@ int main(int argc, char ** argv)
       // child
       if (prctl(PR_SET_PDEATHSIG, SIGKILL)   == -1) { ERR_EXIT("child prctl() failed"); }
       if (ppid != getppid()) { ERRF_EXIT(("parent process(%d) has been dead", ppid)); }
+      if (set_affinities(getpid(), cpuids) == -1) { ERR_EXIT("set_affinity() failed"); }
       if (execvp(command_path, command_args) == -1) { ERRF_EXIT(("execvp() failed [command = %s]", command_path)); };
     }
   }
   return 0;
+}
+
+int set_affinities(pid_t pid, long cpuids)
+{
+    int i = 0;
+    cpu_set_t set;
+    CPU_ZERO(&set);
+    const int bit_size = sizeof(cpuids) * 8;
+    for (i = 0; i < bit_size; ++i) {
+        if ((1l << i) & cpuids) {
+            cpu_set_t tmp;
+            CPU_ZERO(&tmp);
+            CPU_SET(i, &tmp);
+            CPU_OR(&set, &tmp, &set);
+        }
+    }
+    return sched_setaffinity(pid, sizeof(set), &set);
 }
 
 int epoll_add(int epfd, int fd, uint32_t events) {
