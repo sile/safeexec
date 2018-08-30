@@ -68,9 +68,10 @@ quote([])        -> [];
 quote([$\' | S]) -> "'\\''" ++ quote(S);
 quote([C   | S]) -> [C | quote(S)].
 
--spec update_setting(term(), function(), term(), [{term(), term()}]) -> [{term(), term()}].
-update_setting(Key, UpdateFun, InitialValue, Settings) ->
-    case lists:keytake(Key, 1, Settings) of
-        false                          -> [{Key, InitialValue}     | Settings];
-        {value, {_, Value}, Settings2} -> [{Key, UpdateFun(Value)} | Settings2]
-    end.
+-spec update_setting(term(), function(), term(), [{term(), term()} | term()]) -> [{term(), term()} | term()].
+update_setting(Key, UpdateFun, _InitialValue, [{Key, Value} | Settings]) ->
+    [{Key, UpdateFun(Value)} | Settings];
+update_setting(Key, UpdateFun, InitialValue, [Setting | Settings]) ->
+    [Setting | update_setting(Key, UpdateFun, InitialValue, Settings)];
+update_setting(Key, _UpdateFun, InitialValue, []) ->
+    [{Key, InitialValue}].
